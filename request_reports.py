@@ -66,14 +66,24 @@ if __name__ == "__main__":
 
     unixEpoch = int(datetime.datetime.now().strftime('%s'))
     startdate = unixEpoch - (60 * 60 * args.hours)
-    data = { "search": [{"startDate": startdate *1000, "endDate": unixEpoch *1000, "ids": list(names.keys())}] }
+    # batch requests with max 4 IDs each
+    all_ids = list(names.keys())
+    batch_size = 4
+    res = []
 
-    r = requests.post("https://gateway.icloud.com/acsnservice/fetch",
-            auth=getAuth(regenerate=args.regen, second_factor='trusted_device' if args.trusteddevice else 'sms'),
-            headers=generate_anisette_headers(),
-            json=data)
-    res = json.loads(r.content.decode())['results']
-    print(f'{r.status_code}: {len(res)} reports received.')
+    for i in range(0, len(all_ids), batch_size):
+        batch_ids = all_ids[i:i+batch_size]
+        data = { "search": [{"startDate": startdate *1000, "endDate": unixEpoch *1000, "ids": batch_ids}] }
+
+        r = requests.post("https://gateway.icloud.com/acsnservice/fetch",
+                auth=getAuth(regenerate=args.regen, second_factor='trusted_device' if args.trusteddevice else 'sms'),
+                headers=generate_anisette_headers(),
+                json=data)
+        batch_res = json.loads(r.content.decode())['results']
+        res.extend(batch_res)
+        print(f'batch {i//batch_size + 1}: {r.status_code}: {len(batch_res)} reports received.')
+
+    print(f'total: {len(res)} reports received.')
 
     ordered = []
     found = set()
